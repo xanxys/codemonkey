@@ -1,6 +1,9 @@
 import Control.Monad
 import Control.Monad.Random
+import System.Directory
+import System.FilePath
 import System.Random
+import Text.Printf
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -64,16 +67,29 @@ data CodeMonkey = CodeMonkey {
 	freq2 :: M.Map (String, String) Int
 	}
 
+instance Show CodeMonkey where
+	show (CodeMonkey freq2) =
+		printf "2-gram table size: %d" (M.size freq2)
+
 newbieCodeMonkey :: CodeMonkey
 newbieCodeMonkey = CodeMonkey M.empty
 
 learn :: FilePath -> CodeMonkey -> IO CodeMonkey
 learn path cm = do
 	code <- readFile path
+	writeFile "/dev/null" (show $ length code)
+
 	let syms = splitter "" code ++ ["_____EOF_____"]
 	let delta = count2Gram syms
-	return cm{freq2 = M.unionWith (+) delta $ freq2 cm}
+	return $ (length code) `seq` cm{freq2 = M.unionWith (+) delta $ freq2 cm}
+
+getCodePathsIn :: FilePath -> IO [FilePath]
+getCodePathsIn dir_path = do
+	es <- getDirectoryContents dir_path
+	return $ map (dir_path </>) (filter (\x -> takeExtensions x == ".py") es)
 
 main = do
-	cm' <- learn "python-xyx/ylex.py" newbieCodeMonkey	
+	code_paths <- return (take 15) `ap` getCodePathsIn "python-xyx"
+	cm' <- foldM (flip learn) newbieCodeMonkey code_paths
+	print cm'
 	putStrLn . concat =<< evalRandIO (genMC1 $ freq2 cm')
