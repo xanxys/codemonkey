@@ -6,32 +6,6 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 
 
-voc = ["import", "class", "def", "\n", " ", "\t",
-	"Manager", "Web", "Server", "Client", "View", "Model",
-	"for",
-	"dict", "list",
-	"[", "]", ":", "(", ")"]
-
-randomCode :: RandomGen g => Rand g String
-randomCode = do
-	n <- getRandomR (1,50)
-	liftM concat $ replicateM n $ do
-		ix <- getRandomR (0, length voc - 1)
-		return $ voc !! ix
-
---randomCode :: RandomGen g => g -> (String, g)
---randomCode gen
---	|z < 0.5 = 
---	where
---		(z, gen') = randomR (0 :: Double, 1) gen'
---		(ix, gen'') = randomR (0, length voc - 1) gen'
---		w = voc !! ix
-
-
-learn code = return ()
-
-	
-
 splitter :: String -> String -> [String]
 splitter buf "" = wrapBuffer buf
 splitter buf (x:xs)
@@ -85,21 +59,21 @@ genMC1 freq2 = sampleAll "import"
 		targetCount = foldr
 			(\((from, to), count) m -> M.insertWith (+) from count m)
 			M.empty $ M.assocs freq2
-	
+
+data CodeMonkey = CodeMonkey {
+	freq2 :: M.Map (String, String) Int
+	}
+
+newbieCodeMonkey :: CodeMonkey
+newbieCodeMonkey = CodeMonkey M.empty
+
+learn :: FilePath -> CodeMonkey -> IO CodeMonkey
+learn path cm = do
+	code <- readFile path
+	let syms = splitter "" code ++ ["_____EOF_____"]
+	let delta = count2Gram syms
+	return cm{freq2 = M.unionWith (+) delta $ freq2 cm}
 
 main = do
-	c <- readFile "python-xyx/ylex.py"
-	let syms = splitter "" c ++ ["_____EOF_____"]
-	let s_syms = S.fromList syms
-	{-
-	print (length syms)
-	print (S.size s_syms)
-	print $ count2Gram syms
-	-}
-	let freq2 = count2Gram syms
-
-	putStrLn . concat =<< evalRandIO (genMC1 freq2)
-
---	mapM_ print $ splitter "" c
-
-	-- putStrLn =<< evalRandIO randomCode
+	cm' <- learn "python-xyx/ylex.py" newbieCodeMonkey	
+	putStrLn . concat =<< evalRandIO (genMC1 $ freq2 cm')
